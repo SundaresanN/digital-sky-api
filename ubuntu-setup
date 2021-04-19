@@ -1,0 +1,67 @@
+## Tested on Ubuntu 20.04
+sudo apt update
+
+## Install the required packages
+sudo apt install git default-jdk apt-transport-https ca-certificates curl software-properties-common
+
+## Add key to install docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+sudo apt update
+
+## Install docker
+sudo apt install docker-ce
+
+## Install maven
+wget https://mirrors.estointernet.in/apache/maven/maven-3/3.8.1/binaries/apache-maven-3.8.1-bin.tar.gz
+sudo tar xf apache-maven-3.8.1-bin.tar.gz -C /opt
+sudo ln -s /opt/apache-maven-3.8.1 /opt/maven
+
+## Create a maven.sh using nano
+sudo nano /etc/profile.d/maven.sh
+
+## Copy & paste the following without quotes in maven.sh
+
+"""
+export JAVA_HOME=/usr/lib/jvm/default-java
+export M2_HOME=/opt/maven
+export MAVEN_HOME=/opt/maven
+export PATH=${M2_HOME}/bin:${PATH}
+"""
+
+## Now press ctrl+o (to save) and ctrl+x (to close) 
+
+## Make executeable 
+sudo chmod +x /etc/profile.d/maven.sh
+source /etc/profile.d/maven.sh
+
+## Clone digital-sky-api repository
+git clone https://github.com/openskies-sh/digital-sky-api.git
+
+## Change directory
+cd digital-sky-api
+
+## Now compile the api
+mvn clean
+mvn package -DskipTests
+
+## Intiate Database before launching api
+sudo docker run -d --name digital-sky -e "MONGO_INITDB_DATABASE=digitalsky" -p "27017:27017" -v "/home/core/data/mongo:/data/db" mongo:3.3.6
+sudo docker run -d --name local-mysql -e "MYSQL_ROOT_PASSWORD=root" -e "MYSQL_DATABASE=digitalsky" -e "MYSQL_USER=digitalsky" -e "MYSQL_PASSWORD=digitalsky" -p "3306:3306" -v "/home/core/data/mysql:/var/lib/mysql" mysql:latest --default-authentication-plugin=mysql_native_password
+
+## Now run the final command to deploy api
+java -Djava.security.egd=file:/dev/./urandom -jar  target/digitalsky-api-1.0.0.jar
+
+## If need frontend app
+cd ~
+git clone https://github.com/openskies-sh/digital-sky-app.git
+cd digital-sky-app
+
+## Build frontend app for local deployment
+sudo ./build-image.sh local
+
+## Deploy frontend for api now
+sudo ./run-local.sh
+
+## If everything goes without an error, open a browser and visit
+localhost:3000
